@@ -17,41 +17,46 @@ export async function GET(req: Request) {
 
     await dbConnect();
 
-    // 1. Get primary counts
-    const faqsCount = await Faq.countDocuments();
-    const usersCount = await User.countDocuments();
+    // Run ALL DB queries in parallel instead of sequentially
+    const [
+      faqsCount,
+      usersCount,
+      queriesPending,
+      queriesInProgress,
+      queriesSolved,
+      suggestionsPending,
+      suggestionsApproved,
+      suggestionsRejected,
+      queriesByCategory,
+      faqsByCategory,
+      queriesByPriority,
+    ] = await Promise.all([
+      Faq.countDocuments(),
+      User.countDocuments(),
+      Query.countDocuments({ status: 'Pending' }),
+      Query.countDocuments({ status: 'In Progress' }),
+      Query.countDocuments({ status: 'Solved' }),
+      FaqSuggestion.countDocuments({ status: 'Pending' }),
+      FaqSuggestion.countDocuments({ status: 'Approved' }),
+      FaqSuggestion.countDocuments({ status: 'Rejected' }),
+      Query.aggregate([
+        { $group: { _id: '$category', count: { $sum: 1 } } },
+        { $project: { name: '$_id', value: '$count', _id: 0 } },
+      ]),
+      Faq.aggregate([
+        { $group: { _id: '$category', count: { $sum: 1 } } },
+        { $project: { name: '$_id', value: '$count', _id: 0 } },
+      ]),
+      Query.aggregate([
+        { $group: { _id: '$priority', count: { $sum: 1 } } },
+        { $project: { name: '$_id', value: '$count', _id: 0 } },
+      ]),
+    ]);
 
-    // Queries status breakdown
-    const queriesPending = await Query.countDocuments({ status: 'Pending' });
-    const queriesInProgress = await Query.countDocuments({ status: 'In Progress' });
-    const queriesSolved = await Query.countDocuments({ status: 'Solved' });
     const totalQueries = queriesPending + queriesInProgress + queriesSolved;
-
-    // Suggestions status breakdown
-    const suggestionsPending = await FaqSuggestion.countDocuments({ status: 'Pending' });
-    const suggestionsApproved = await FaqSuggestion.countDocuments({ status: 'Approved' });
-    const suggestionsRejected = await FaqSuggestion.countDocuments({ status: 'Rejected' });
     const totalSuggestions = suggestionsPending + suggestionsApproved + suggestionsRejected;
 
-    // 2. Aggregate queries by category (to draw charts)
-    const queriesByCategory = await Query.aggregate([
-      { $group: { _id: '$category', count: { $sum: 1 } } },
-      { $project: { name: '$_id', value: '$count', _id: 0 } },
-    ]);
-
-    // 3. Aggregate FAQs by category
-    const faqsByCategory = await Faq.aggregate([
-      { $group: { _id: '$category', count: { $sum: 1 } } },
-      { $project: { name: '$_id', value: '$count', _id: 0 } },
-    ]);
-
-    // 4. Aggregate queries by priority
-    const queriesByPriority = await Query.aggregate([
-      { $group: { _id: '$priority', count: { $sum: 1 } } },
-      { $project: { name: '$_id', value: '$count', _id: 0 } },
-    ]);
-
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         counts: {
           faqs: faqsCount,
@@ -77,6 +82,11 @@ export async function GET(req: Request) {
       },
       { status: 200 }
     );
+
+    // Cache for 30 seconds to avoid hammering DB on rapid navigation
+    response.headers.set('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
+
+    return response;
   } catch (error: any) {
     console.error('Error fetching admin stats:', error);
     return NextResponse.json(

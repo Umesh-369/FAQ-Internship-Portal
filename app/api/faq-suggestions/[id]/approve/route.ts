@@ -3,6 +3,7 @@ import { auth } from '../../../../../auth';
 import dbConnect from '../../../../../lib/db';
 import FaqSuggestion from '../../../../../models/FaqSuggestion';
 import Faq from '../../../../../models/Faq';
+import { getOrGenerateFaqEmbedding } from '../../../../../lib/embeddings';
 
 // PUT /api/faq-suggestions/[id]/approve (Admin only)
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -34,11 +35,27 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     suggestion.adminReview = adminReview || 'Approved by administrator.';
     await suggestion.save();
 
-    // 2. Insert into real FAQs
+    // 2. Insert into real FAQs with embedding
+    let embedding: number[] | undefined;
+    let embeddingHash: string | undefined;
+
+    try {
+      const embRes = await getOrGenerateFaqEmbedding({
+        question: suggestion.question,
+        answer: suggestion.suggestedAnswer,
+        category: suggestion.category,
+      });
+      embedding = embRes.embedding;
+      embeddingHash = embRes.embeddingHash;
+    } catch (embErr) {
+      console.warn('Embedding generation skipped on suggestion approval:', embErr);
+    }
+
     const newFaq = await Faq.create({
       question: suggestion.question,
       answer: suggestion.suggestedAnswer,
       category: suggestion.category,
+      ...(embedding && embeddingHash ? { embedding, embeddingHash } : {}),
     });
 
     return NextResponse.json(

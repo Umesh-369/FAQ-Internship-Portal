@@ -17,13 +17,16 @@ export async function GET(req: Request) {
     let queries;
     if (session.user.role === 'admin') {
       // Admin gets all queries, sorted newest first
-      queries = await Query.find({}).sort({ createdAt: -1 });
+      queries = await Query.find({}).sort({ createdAt: -1 }).lean();
     } else {
       // Standard student gets their own queries
-      queries = await Query.find({ userId: session.user.id }).sort({ createdAt: -1 });
+      queries = await Query.find({ userId: session.user.id }).sort({ createdAt: -1 }).lean();
     }
 
-    return NextResponse.json(queries, { status: 200 });
+    const response = NextResponse.json(queries, { status: 200 });
+    response.headers.set('Cache-Control', 'private, max-age=10, stale-while-revalidate=30');
+
+    return response;
   } catch (error: any) {
     console.error('Error fetching queries:', error);
     return NextResponse.json(

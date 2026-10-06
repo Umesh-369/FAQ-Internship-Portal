@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '../../../auth';
 import dbConnect from '../../../lib/db';
 import Faq from '../../../models/Faq';
+import { getOrGenerateFaqEmbedding } from '../../../lib/embeddings';
 
 // GET /api/faqs
 export async function GET(req: Request) {
@@ -27,12 +28,22 @@ export async function GET(req: Request) {
     if (search) {
       faqs = await Faq.find(query)
         .select({ score: { $meta: 'textScore' } })
-        .sort({ score: { $meta: 'textScore' } });
+        .sort({ score: { $meta: 'textScore' } })
+        .lean();
     } else {
-      faqs = await Faq.find(query).sort({ createdAt: -1 });
+      faqs = await Faq.find(query).sort({ createdAt: -1 }).lean();
     }
 
-    return NextResponse.json(faqs, { status: 200 });
+    const response = NextResponse.json(faqs, { status: 200 });
+
+    // Cache non-search results for 30s, search results for 10s
+    if (!search) {
+      response.headers.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
+    } else {
+      response.headers.set('Cache-Control', 'public, max-age=10, stale-while-revalidate=30');
+    }
+
+    return response;
   } catch (error: any) {
     console.error('Error fetching FAQs:', error);
     return NextResponse.json(
@@ -59,10 +70,22 @@ export async function POST(req: Request) {
 
     await dbConnect();
 
+    let embedding: number[] | undefined;
+    let embeddingHash: string | undefined;
+
+    try {
+      const embRes = await getOrGenerateFaqEmbedding({ question, answer, category });
+      embedding = embRes.embedding;
+      embeddingHash = embRes.embeddingHash;
+    } catch (embErr) {
+      console.warn('Embedding generation skipped on FAQ create:', embErr);
+    }
+
     const newFaq = await Faq.create({
       question,
       answer,
       category,
+      ...(embedding && embeddingHash ? { embedding, embeddingHash } : {}),
     });
 
     return NextResponse.json(newFaq, { status: 201 });

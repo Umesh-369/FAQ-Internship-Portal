@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '../../../../auth';
 import dbConnect from '../../../../lib/db';
 import Faq from '../../../../models/Faq';
+import { getOrGenerateFaqEmbedding } from '../../../../lib/embeddings';
 
 // PUT /api/faqs/[id] (Admin only)
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -21,15 +22,38 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     await dbConnect();
 
-    const updatedFaq = await Faq.findByIdAndUpdate(
-      id,
-      { question, answer, category },
-      { new: true, runValidators: true }
-    );
-
-    if (!updatedFaq) {
+    const existingFaq = await Faq.findById(id).select('+embedding +embeddingHash');
+    if (!existingFaq) {
       return NextResponse.json({ message: 'FAQ not found' }, { status: 404 });
     }
+
+    let embedding = existingFaq.embedding;
+    let embeddingHash = existingFaq.embeddingHash;
+
+    try {
+      const embRes = await getOrGenerateFaqEmbedding({
+        question,
+        answer,
+        category,
+        embedding: existingFaq.embedding,
+        embeddingHash: existingFaq.embeddingHash,
+      });
+      embedding = embRes.embedding;
+      embeddingHash = embRes.embeddingHash;
+    } catch (embErr) {
+      console.warn('Embedding update skipped on FAQ edit:', embErr);
+    }
+
+    const updatedFaq = await Faq.findByIdAndUpdate(
+      id,
+      {
+        question,
+        answer,
+        category,
+        ...(embedding && embeddingHash ? { embedding, embeddingHash } : {}),
+      },
+      { new: true, runValidators: true }
+    );
 
     return NextResponse.json(updatedFaq, { status: 200 });
   } catch (error: any) {

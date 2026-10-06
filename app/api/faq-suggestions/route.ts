@@ -19,14 +19,19 @@ export async function GET(req: Request) {
       // Admin gets all suggestions
       suggestions = await FaqSuggestion.find({})
         .populate('userId', 'name email')
-        .sort({ createdAt: -1 });
+        .sort({ createdAt: -1 })
+        .lean();
     } else {
       // Student gets their own suggestions
       suggestions = await FaqSuggestion.find({ userId: session.user.id })
-        .sort({ createdAt: -1 });
+        .sort({ createdAt: -1 })
+        .lean();
     }
 
-    return NextResponse.json(suggestions, { status: 200 });
+    const response = NextResponse.json(suggestions, { status: 200 });
+    response.headers.set('Cache-Control', 'private, max-age=10, stale-while-revalidate=30');
+
+    return response;
   } catch (error: any) {
     console.error('Error fetching suggestions:', error);
     return NextResponse.json(

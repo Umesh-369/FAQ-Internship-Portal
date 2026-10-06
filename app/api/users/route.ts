@@ -17,9 +17,13 @@ export async function GET(req: Request) {
     // Select name, email, role, and createdAt fields, excluding password
     const users = await User.find({})
       .select('name email role createdAt')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
-    return NextResponse.json(users, { status: 200 });
+    const response = NextResponse.json(users, { status: 200 });
+    response.headers.set('Cache-Control', 'private, max-age=15, stale-while-revalidate=30');
+
+    return response;
   } catch (error: any) {
     console.error('Error fetching users:', error);
     return NextResponse.json(

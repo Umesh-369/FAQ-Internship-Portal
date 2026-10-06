@@ -1,139 +1,164 @@
 import { NextResponse } from 'next/server';
+import { auth } from '../../../auth';
 import dbConnect from '../../../lib/db';
-import Faq from '../../../models/Faq';
 import ChatHistory from '../../../models/ChatHistory';
+import { generateEmbedding } from '../../../lib/embeddings';
+import { searchFaqsByVector, getSimilarityThreshold, VectorSearchResult } from '../../../lib/vectorSearch';
+import { searchFaqsByKeyword } from '../../../lib/keywordSearch';
+import { generateGroundedAnswer, PORTAL_FALLBACK_MESSAGE } from '../../../lib/openrouter';
+import { checkRateLimit } from '../../../lib/rateLimit';
 
-// Common stop words to filter out before searching
-const STOP_WORDS = new Set([
-  'i', 'me', 'my', 'we', 'our', 'you', 'your', 'he', 'she', 'it', 'they',
-  'what', 'which', 'who', 'whom', 'this', 'that', 'these', 'those',
-  'is', 'am', 'are', 'was', 'were', 'be', 'been', 'being',
-  'have', 'has', 'had', 'having', 'do', 'does', 'did', 'doing',
-  'a', 'an', 'the', 'and', 'but', 'if', 'or', 'so', 'as', 'of',
-  'at', 'by', 'for', 'with', 'about', 'to', 'from', 'in', 'on',
-  'will', 'would', 'can', 'could', 'should', 'shall', 'may', 'might',
-  'not', 'no', 'nor', 'don', 'doesn', 'didn', 'won', 'wouldn',
-  'there', 'here', 'when', 'where', 'why', 'how', 'all', 'any',
-  'both', 'each', 'more', 'most', 'some', 'such', 'than', 'too',
-  'very', 'just', 'also', 'only', 'own', 'same', 'tell', 'get',
-  'please', 'hi', 'hello', 'hey', 'thanks', 'thank',
-]);
+// Fire-and-forget: save chat history safely using authenticated user session
+function saveChatHistoryAsync(userId: string, userMessage: string, botAnswer: string) {
+  const userExchange = [
+    { sender: 'user', text: userMessage, timestamp: new Date() },
+    { sender: 'bot', text: botAnswer, timestamp: new Date() },
+  ];
 
-// Minimum textScore to accept a match as relevant
-const MIN_TEXT_SCORE = 1.5;
-
-function extractKeywords(text: string): string[] {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .split(/\s+/)
-    .filter((w) => w.length > 1 && !STOP_WORDS.has(w));
+  ChatHistory.findOne({ userId })
+    .then((existingHistory) => {
+      if (existingHistory) {
+        existingHistory.messages.push(...(userExchange as any));
+        return existingHistory.save();
+      } else {
+        return ChatHistory.create({
+          userId,
+          messages: userExchange,
+        });
+      }
+    })
+    .catch((dbErr) => {
+      console.error('Failed to save chat history:', dbErr);
+    });
 }
 
 export async function POST(req: Request) {
   try {
-    const { message, userId } = await req.json();
+    // 1. Authenticate user from session (do NOT trust client-supplied userId)
+    const session = await auth();
+    const authenticatedUserId = session?.user?.id;
 
-    if (!message) {
-      return NextResponse.json({ message: 'Message is required' }, { status: 400 });
+    // 2. Per-user or per-IP rate limiting
+    const clientIp = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || '127.0.0.1';
+    const rateLimitKey = authenticatedUserId ? `user:${authenticatedUserId}` : `ip:${clientIp}`;
+    const { allowed } = checkRateLimit(rateLimitKey);
+
+    if (!allowed) {
+      return NextResponse.json(
+        {
+          answer: 'You have sent too many requests. Please wait a moment before trying again.',
+          suggestions: [],
+          sources: [],
+          isFallback: true,
+        },
+        { status: 429 }
+      );
     }
+
+    // 3. Parse and validate request body
+    const body = await req.json().catch(() => ({}));
+    const rawMessage = body?.message;
+
+    if (!rawMessage || typeof rawMessage !== 'string' || !rawMessage.trim()) {
+      return NextResponse.json({ message: 'Message is required and cannot be empty.' }, { status: 400 });
+    }
+
+    const userMessage = rawMessage.trim().slice(0, 1000); // Sanitize max length
 
     await dbConnect();
 
-    const keywords = extractKeywords(message);
+    // 4. Generate query embedding and perform vector search
+    let matchingFaqs: VectorSearchResult[] = [];
+    const threshold = getSimilarityThreshold();
 
-    let answer = '';
-    let suggestions: { question: string }[] = [];
-    let isFallback = false;
+    try {
+      const queryEmbedding = await generateEmbedding(userMessage);
+      const vectorResults = await searchFaqsByVector(queryEmbedding, 5);
 
-    // 1. Try MongoDB $text search with keyword-only query
-    let matches: any[] = [];
-    if (keywords.length > 0) {
-      const searchQuery = keywords.join(' ');
-      const rawMatches = await Faq.find(
-        { $text: { $search: searchQuery } },
-        { score: { $meta: 'textScore' } }
-      )
-        .sort({ score: { $meta: 'textScore' } })
-        .limit(5);
-
-      // Filter by minimum relevance score
-      matches = rawMatches.filter(
-        (m: any) => (m as any)._doc.score >= MIN_TEXT_SCORE
-      );
+      // Filter by similarity threshold
+      matchingFaqs = vectorResults.filter((r) => r.score >= threshold);
+    } catch (vectorError: any) {
+      console.warn('Vector embedding/search failed, trying keyword fallback:', vectorError.message);
     }
 
-    // 2. Fallback: regex search on question field if text search gave no good results
-    if (matches.length === 0 && keywords.length > 0) {
-      const regexPatterns = keywords.map(
-        (kw) => new RegExp(kw, 'i')
-      );
-      // Find FAQs where the question contains at least 2 keywords (or 1 if only 1 keyword)
-      const minKeywordMatch = Math.min(keywords.length, 2);
-      const regexResults = await Faq.find({
-        question: { $in: regexPatterns.map((r) => r) },
-      }).limit(10);
-
-      // Score by how many keywords appear in the question
-      const scored = regexResults
-        .map((faq: any) => {
-          const q = faq.question.toLowerCase();
-          const hitCount = keywords.filter((kw) => q.includes(kw)).length;
-          return { faq, hitCount };
-        })
-        .filter((item) => item.hitCount >= minKeywordMatch)
-        .sort((a, b) => b.hitCount - a.hitCount);
-
-      matches = scored.slice(0, 3).map((item) => item.faq);
-    }
-
-    if (matches.length > 0) {
-      answer = matches[0].answer;
-      suggestions = matches.slice(1, 3).map((m: any) => ({
-        question: m.question,
-      }));
-    } else {
-      isFallback = true;
-      answer = "I'm sorry, I couldn't find a direct answer to your question about the Vicharanashala Internship in our database. You can try searching our FAQ page, suggest this FAQ to admins, or raise a support query to get human coordinator assistance.";
-    }
-
-    // 2. Save exchange in chatHistory if userId is provided
-    if (userId) {
-      try {
-        const userExchange = [
-          { sender: 'user', text: message, timestamp: new Date() },
-          { sender: 'bot', text: answer, timestamp: new Date() },
-        ];
-
-        const existingHistory = await ChatHistory.findOne({ userId });
-
-        if (existingHistory) {
-          existingHistory.messages.push(...(userExchange as any));
-          await existingHistory.save();
-        } else {
-          await ChatHistory.create({
-            userId,
-            messages: userExchange,
-          });
-        }
-      } catch (dbErr) {
-        console.error('Failed to save chat history:', dbErr);
-        // Do not crash the API, proceed to return response
+    // 5. Keyword search fallback if vector search yielded no qualifying results
+    if (matchingFaqs.length === 0) {
+      const keywordResults = await searchFaqsByKeyword(userMessage, 3);
+      if (keywordResults.length > 0) {
+        matchingFaqs = keywordResults.map((kr) => ({
+          id: kr.id,
+          question: kr.question,
+          answer: kr.answer,
+          category: kr.category,
+          score: Math.min(0.9, 0.65 + (kr.score * 0.05)), // Estimate normalized score for keyword hits
+        }));
       }
+    }
+
+    // 6. If no FAQs matched, return fallback response
+    if (matchingFaqs.length === 0) {
+      const fallbackResponse = {
+        answer: PORTAL_FALLBACK_MESSAGE,
+        suggestions: [
+          { question: 'What is VINS?' },
+          { question: 'How do I submit the NOC?' },
+          { question: 'What is the Rosetta journal?' },
+        ],
+        sources: [],
+        isFallback: true,
+      };
+
+      if (authenticatedUserId) {
+        saveChatHistoryAsync(authenticatedUserId, userMessage, fallbackResponse.answer);
+      }
+
+      return NextResponse.json(fallbackResponse, { status: 200 });
+    }
+
+    // 7. Generate grounded answer with OpenRouter using top relevant FAQs
+    const topFaqs = matchingFaqs.slice(0, 4);
+    const generation = await generateGroundedAnswer(userMessage, topFaqs);
+
+    const answer = generation.answer;
+    const isFallback = generation.isFallback;
+
+    // Format sources
+    const sources = topFaqs.map((f) => ({
+      id: f.id,
+      question: f.question,
+      category: f.category,
+      score: Number(f.score.toFixed(3)),
+    }));
+
+    // Generate follow-up suggestions from retrieved FAQs or alternate questions
+    const suggestions = matchingFaqs
+      .slice(1, 4)
+      .map((f) => ({ question: f.question }));
+
+    // 8. Save chat history non-blocking if user is authenticated
+    if (authenticatedUserId) {
+      saveChatHistoryAsync(authenticatedUserId, userMessage, answer);
     }
 
     return NextResponse.json(
       {
         answer,
         suggestions,
+        sources,
         isFallback,
       },
       { status: 200 }
     );
   } catch (error: any) {
-    console.error('Chat error:', error);
+    console.error('Chat API Error:', error);
     return NextResponse.json(
-      { message: 'Internal server error', error: error.message },
+      {
+        answer: PORTAL_FALLBACK_MESSAGE,
+        suggestions: [],
+        sources: [],
+        isFallback: true,
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      },
       { status: 500 }
     );
   }

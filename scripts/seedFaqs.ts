@@ -228,15 +228,28 @@ async function seed() {
     console.log("Connecting to database...");
     const dbConnect = (await import('../lib/db')).default;
     const Faq = (await import('../models/Faq')).default;
+    const { getOrGenerateFaqEmbedding } = await import('../lib/embeddings');
 
     await dbConnect();
     
     console.log("Clearing existing FAQs...");
     await Faq.deleteMany({});
     
-    console.log("Seeding new FAQs...");
-    const result = await Faq.insertMany(FAQ_SEED);
-    console.log(`Seeding complete! Successfully seeded ${result.length} FAQs.`);
+    console.log("Generating embeddings and seeding new FAQs...");
+    const faqsWithEmbeddings = [];
+    for (let i = 0; i < FAQ_SEED.length; i++) {
+      const item = FAQ_SEED[i];
+      const { embedding, embeddingHash } = await getOrGenerateFaqEmbedding(item);
+      faqsWithEmbeddings.push({
+        ...item,
+        embedding,
+        embeddingHash,
+      });
+      console.log(`[${i + 1}/${FAQ_SEED.length}] Prepared embedding for: "${item.question.slice(0, 35)}..."`);
+    }
+
+    const result = await Faq.insertMany(faqsWithEmbeddings);
+    console.log(`🎉 Seeding complete! Successfully seeded ${result.length} FAQs with embeddings.`);
     
     process.exit(0);
   } catch (error) {

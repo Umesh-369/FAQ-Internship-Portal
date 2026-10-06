@@ -41,13 +41,16 @@ export default function StudentDashboardPage() {
   const fetchDashboardData = async () => {
     setIsLoading(true);
     try {
-      // 1. Fetch queries
-      const qRes = await fetch('/api/queries');
-      const qData = qRes.ok ? await qRes.json() : [];
+      // Fetch queries and suggestions in parallel
+      const [qRes, sRes] = await Promise.all([
+        fetch('/api/queries'),
+        fetch('/api/faq-suggestions'),
+      ]);
 
-      // 2. Fetch FAQ suggestions
-      const sRes = await fetch('/api/faq-suggestions');
-      const sData = sRes.ok ? await sRes.json() : [];
+      const [qData, sData] = await Promise.all([
+        qRes.ok ? qRes.json() : [],
+        sRes.ok ? sRes.json() : [],
+      ]);
 
       setQueries(qData);
       setSuggestions(sData);

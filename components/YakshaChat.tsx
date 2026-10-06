@@ -1,10 +1,16 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquare, X, Send, Sparkles, AlertCircle, HelpCircle } from 'lucide-react';
+import { MessageSquare, X, Send, Sparkles, AlertCircle, HelpCircle, BookOpen, ChevronDown, ChevronUp } from 'lucide-react';
 import Link from 'next/link';
+
+interface SourceItem {
+  id: string;
+  question: string;
+  category: string;
+  score?: number;
+}
 
 interface Message {
   id: string;
@@ -12,12 +18,13 @@ interface Message {
   text: string;
   timestamp: Date;
   suggestions?: { question: string }[];
+  sources?: SourceItem[];
   isFallback?: boolean;
 }
 
 export default function YakshaChat() {
-  const { data: session } = useSession();
   const [isOpen, setIsOpen] = useState(false);
+  const [expandedSources, setExpandedSources] = useState<Record<string, boolean>>({});
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'greeting',
@@ -41,6 +48,10 @@ export default function YakshaChat() {
     }
   }, [messages, isOpen, isLoading]);
 
+  const toggleSources = (msgId: string) => {
+    setExpandedSources((prev) => ({ ...prev, [msgId]: !prev[msgId] }));
+  };
+
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputValue.trim() || isLoading) return;
@@ -63,7 +74,6 @@ export default function YakshaChat() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: userMessageText,
-          userId: session?.user?.id || null,
         }),
       });
 
@@ -78,6 +88,7 @@ export default function YakshaChat() {
             text: data.answer,
             timestamp: new Date(),
             suggestions: data.suggestions || [],
+            sources: data.sources || [],
             isFallback: data.isFallback || false,
           },
         ]);
@@ -108,7 +119,7 @@ export default function YakshaChat() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 50, scale: 0.9 }}
             transition={{ type: 'spring', damping: 25, stiffness: 350 }}
-            className="mb-4 w-[360px] h-[500px] rounded-2xl glass-card border border-white/30 flex flex-col shadow-2xl overflow-hidden"
+            className="mb-4 w-[380px] h-[520px] rounded-2xl glass-card border border-white/30 flex flex-col shadow-2xl overflow-hidden"
           >
             {/* Chat Header */}
             <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 flex items-center justify-between text-white shrink-0">
@@ -120,7 +131,7 @@ export default function YakshaChat() {
                   <h3 className="font-semibold text-sm tracking-wide">Yaksha Mini</h3>
                   <p className="text-[10px] text-blue-100 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span>
-                    Support Assistant
+                    Grounded RAG Assistant
                   </p>
                 </div>
               </div>
@@ -137,18 +148,50 @@ export default function YakshaChat() {
               {messages.map((msg) => (
                 <div
                   key={msg.id}
-                  className={`flex flex-col max-w-[80%] ${
+                  className={`flex flex-col max-w-[85%] ${
                     msg.sender === 'user' ? 'self-end items-end' : 'self-start items-start'
                   }`}
                 >
                   <div
-                    className={`p-3 rounded-2xl text-sm leading-relaxed ${
+                    className={`p-3.5 rounded-2xl text-sm leading-relaxed ${
                       msg.sender === 'user'
                         ? 'bg-blue-600 text-white rounded-br-none shadow-md shadow-blue-500/10'
                         : 'bg-white border border-slate-100 text-slate-800 rounded-bl-none shadow-sm'
                     }`}
                   >
-                    {msg.text}
+                    <div className="whitespace-pre-line">{msg.text}</div>
+
+                    {/* Sources Badge / Collapsible */}
+                    {msg.sender === 'bot' && msg.sources && msg.sources.length > 0 && !msg.isFallback && (
+                      <div className="mt-2.5 pt-2 border-t border-slate-100 text-xs">
+                        <button
+                          onClick={() => toggleSources(msg.id)}
+                          className="flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                        >
+                          <BookOpen className="w-3 h-3" />
+                          <span>{msg.sources.length} Verified FAQ Source{msg.sources.length > 1 ? 's' : ''}</span>
+                          {expandedSources[msg.id] ? (
+                            <ChevronUp className="w-3 h-3 ml-0.5" />
+                          ) : (
+                            <ChevronDown className="w-3 h-3 ml-0.5" />
+                          )}
+                        </button>
+
+                        {expandedSources[msg.id] && (
+                          <div className="mt-1.5 flex flex-col gap-1 pl-1">
+                            {msg.sources.map((src, sIdx) => (
+                              <div
+                                key={src.id || sIdx}
+                                className="p-1.5 bg-slate-50 rounded border border-slate-100 text-[11px] text-slate-700"
+                              >
+                                <span className="font-semibold text-blue-700 block">{src.category}:</span>
+                                <span className="text-slate-600">{src.question}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Fallback buttons */}
                     {msg.isFallback && (

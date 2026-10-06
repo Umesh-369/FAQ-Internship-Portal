@@ -149,10 +149,9 @@ function FaqContent() {
               {faqs.map((faq) => {
                 const isExpanded = expandedFaqId === faq._id;
                 return (
-                  <motion.div
+                  <div
                     key={faq._id}
-                    layout="position"
-                    className="rounded-2xl border border-slate-100 bg-white hover:border-slate-200/80 hover:shadow-sm overflow-hidden transition-all"
+                    className="rounded-2xl border border-slate-100 bg-white hover:border-slate-200/80 hover:shadow-sm overflow-hidden transition-colors"
                   >
                     <button
                       onClick={() => toggleExpand(faq._id)}
@@ -184,7 +183,7 @@ function FaqContent() {
                           initial={{ height: 0, opacity: 0 }}
                           animate={{ height: 'auto', opacity: 1 }}
                           exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.25, ease: 'easeInOut' }}
+                          transition={{ duration: 0.2, ease: 'easeOut' }}
                         >
                           <div className="px-6 pb-6 pt-1 border-t border-slate-50 text-xs sm:text-sm text-slate-500 leading-relaxed font-sans pl-[58px]">
                             {faq.answer}
@@ -192,7 +191,7 @@ function FaqContent() {
                         </motion.div>
                       )}
                     </AnimatePresence>
-                  </motion.div>
+                  </div>
                 );
               })}
             </div>

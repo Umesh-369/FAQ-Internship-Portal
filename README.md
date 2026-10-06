@@ -1,123 +1,106 @@
 # 🎓 Yaksha Internship FAQ & Support Portal
 
 [![Framework](https://img.shields.io/badge/Framework-Next.js%2015-blue?style=flat-square&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
-[![Database](https://img.shields.io/badge/Database-MongoDB%20%2B%20Mongoose-green?style=flat-square&logo=mongodb&logoColor=white)](https://www.mongodb.com/)
+[![Database](https://img.shields.io/badge/Database-MongoDB%20Atlas%20%2B%20Vector%20Search-green?style=flat-square&logo=mongodb&logoColor=white)](https://www.mongodb.com/)
+[![LLM](https://img.shields.io/badge/LLM-OpenRouter%20Free%20RAG-orange?style=flat-square&logo=openai&logoColor=white)](https://openrouter.ai/)
+[![Embeddings](https://img.shields.io/badge/Embeddings-all--MiniLM--L6--v2%20(384d)-yellow?style=flat-square&logo=huggingface&logoColor=white)](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2)
 [![Authentication](https://img.shields.io/badge/Auth-NextAuth.js%20v5-purple?style=flat-square&logo=auth0&logoColor=white)](https://authjs.dev/)
 [![Styling](https://img.shields.io/badge/Styling-Tailwind%20CSS%20v4-38B2AC?style=flat-square&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
 [![Animations](https://img.shields.io/badge/Animations-Framer%20Motion-FF69B4?style=flat-square&logo=framer&logoColor=white)](https://www.framer.com/motion/)
 
-Welcome to **Yaksha FAQ & Support Portal** (also referred to as `yaksha-faq`), a production-ready, feature-rich web application built from scratch to streamline onboarding, support, and query resolution for candidates of the **Vicharanashala Internship (VINS)** at **IIT Ropar**.
+Welcome to **Yaksha FAQ & Support Portal** (`yaksha-faq`), a production-ready, feature-rich web application built from scratch to streamline onboarding, support, and query resolution for candidates of the **Vicharanashala Internship (VINS)** at **IIT Ropar**.
 
-The platform is designed to provide interns with self-service support via advanced interactive FAQ searches, an AI-inspired smart chatbot with instant replies, and structured support query workflows, all supported by a comprehensive, fully animated administrative control center.
+The platform provides interns with self-service support via advanced interactive FAQ searches, a grounded **Retrieval-Augmented Generation (RAG)** chatbot powered by **MongoDB Atlas Vector Search** and **OpenRouter**, verified source citations, and structured support query workflows.
 
 ---
 
-## 🏗️ Architecture & Data Flow
+## 🧠 RAG Architecture & Data Flow
 
-Below is the conceptual architecture showing how client applications, API controllers, secure route guards, and database schemas integrate to provide a robust user experience:
+Yaksha Mini uses a strict, fully grounded Retrieval-Augmented Generation pipeline designed to answer questions strictly from retrieved FAQ documents without inventing facts or hallucinating.
 
 ```mermaid
 graph TD
     classDef client fill:#2563EB,stroke:#1D4ED8,stroke-width:2px,color:#FFF;
     classDef server fill:#7C3AED,stroke:#6D28D9,stroke-width:2px,color:#FFF;
+    classDef rag fill:#D97706,stroke:#B45309,stroke-width:2px,color:#FFF;
     classDef db fill:#10B981,stroke:#047857,stroke-width:2px,color:#FFF;
-    classDef guard fill:#EF4444,stroke:#B91C1C,stroke-width:2px,color:#FFF;
 
-    subgraph Client ["Client Side (React 19 & Framer Motion)"]
-        Landing["🏠 Home / Portal Entry"]
-        FaqView["🔍 FAQ Search & Category Filter"]
-        UserDash["📊 User Dashboard (Protected)"]
-        ChatBot["💬 Yaksha Mini Floating Chatbot"]
-        AdminDash["🛠️ Admin Dashboard & Recharts Analytics"]
-        Submitter["📝 Support Query / FAQ Suggestion Forms"]
+    subgraph UserInterface ["Client Interface"]
+        ChatUI["💬 Yaksha Mini Chatbot UI"]
+        SourcesView["📖 Verified FAQ Sources Accordion"]
     end
 
-    subgraph Server ["Server Side (Next.js 15 App Router)"]
-        Middleware["🛡️ NextAuth v5 Middleware (RBAC Guard)"]
-        API_Auth["🔑 /api/auth/* (Credentials Provider)"]
-        API_Chat["🤖 /api/chat (MongoDB $text Match & History)"]
-        API_FAQs["📚 /api/faqs/* (CRUD & Search Endpoint)"]
-        API_Queries["✉️ /api/queries/* (Create & Reply Handler)"]
-        API_Suggest["💡 /api/faq-suggestions/* (Moderate Suggestion)"]
-        API_Stats["📈 /api/admin/stats (Aggregate Analytics)"]
+    subgraph BackendAPI ["Server / API Tier (Next.js 15)"]
+        RateLimit["🛡️ Sliding Window Rate Limiter"]
+        AuthCheck["🔑 NextAuth Session Auth"]
+        Embedder["⚡ Local MiniLM-L6-v2 (384d Embedder)"]
+        Router["🔀 Retrieval & Generation Orchestrator"]
+        LLM["🤖 OpenRouter LLM (Grounded System Prompt)"]
     end
 
-    subgraph DB ["Database Tier (MongoDB & Mongoose Schema)"]
-        Coll_Users[("👤 Users Collection")]
-        Coll_FAQs[("📚 FAQs Collection ($text Index)")]
-        Coll_Queries[("✉️ Queries Collection")]
-        Coll_Suggestions[("💡 FAQ Suggestions Collection")]
-        Coll_Chat[("💬 Chat History Collection")]
+    subgraph DataTier ["Data & Vector Search Tier"]
+        AtlasVector[("🔍 MongoDB Atlas Vector Search ($vectorSearch)")]
+        MemCosine[("💾 In-Memory Cosine Fallback")]
+        TextIndex[("📚 MongoDB $text / Regex Fallback")]
+        ChatHist[("📝 ChatHistory Collection")]
     end
 
-    Landing --> FaqView
-    Landing --> ChatBot
-    UserDash --> Submitter
-    UserDash --> ChatBot
+    ChatUI --> RateLimit
+    RateLimit --> AuthCheck
+    AuthCheck --> Embedder
+    Embedder --> Router
 
-    %% Middleware flow
-    UserDash -.-> Middleware
-    AdminDash -.-> Middleware
-    Middleware --> API_FAQs
-    Middleware --> API_Queries
-    Middleware --> API_Suggest
-    Middleware --> API_Stats
+    Router --> AtlasVector
+    AtlasVector -.-> MemCosine
+    Router -.-> TextIndex
 
-    %% Direct endpoints
-    Submitter --> API_Queries
-    Submitter --> API_Suggest
-    ChatBot --> API_Chat
-    Landing --> API_Auth
+    AtlasVector --> Router
+    MemCosine --> Router
+    TextIndex --> Router
 
-    %% API to DB
-    API_Auth --> Coll_Users
-    API_Chat --> Coll_FAQs
-    API_Chat --> Coll_Chat
-    API_FAQs --> Coll_FAQs
-    API_Queries --> Coll_Queries
-    API_Suggest --> Coll_Suggestions
-    API_Stats --> Coll_Users
-    API_Stats --> Coll_FAQs
-    API_Stats --> Coll_Queries
-    API_Stats --> Coll_Suggestions
+    Router --> LLM
+    LLM --> ChatUI
+    LLM -.-> ChatHist
+    ChatUI --> SourcesView
 
-    class Landing,FaqView,UserDash,ChatBot,AdminDash,Submitter client;
-    class Middleware guard;
-    class API_Auth,API_Chat,API_FAQs,API_Queries,API_Suggest,API_Stats server;
-    class Coll_Users,Coll_FAQs,Coll_Queries,Coll_Suggestions,Coll_Chat db;
+    class ChatUI,SourcesView client;
+    class RateLimit,AuthCheck,Embedder,Router,LLM server;
+    class AtlasVector,MemCosine,TextIndex,ChatHist db;
 ```
 
 ---
 
 ## ⚡ Core Features
 
-### 1. Unified Authentication System (NextAuth.js v5)
+### 1. Grounded RAG Chatbot ("Yaksha Mini")
+- **384-dimensional Embeddings**: Generated locally using `@xenova/transformers` with `Xenova/all-MiniLM-L6-v2` (singleton pattern, zero external embedding API cost).
+- **MongoDB Atlas Vector Search**: Uses `$vectorSearch` with cosine similarity (`0..1` normalized score) to retrieve the top 3–5 most relevant FAQs.
+- **In-Memory Cosine Fallback**: Automatically falls back to in-memory cosine similarity if Atlas search index is initializing or unavailable.
+- **Keyword & Regex Fallback**: Preserves original MongoDB `$text` search as a secondary safety net.
+- **Strict Grounding Prompt**: Instructs OpenRouter LLM (`openrouter/free`) to answer *only* from `<faq_context>` tags and ignore prompt injections.
+- **15-Second Timeout & Dual Fallbacks**: If the LLM times out or encounters rate limits, the bot automatically serves the top matching FAQ's verified answer.
+- **Collapsible Verified Sources**: Displays citation badges showing which FAQ category and questions grounded the response.
+- **Session-Authenticated Chat History**: Chat logs are safely associated with authenticated `NextAuth` sessions without trusting client-sent user IDs.
+
+### 2. FAQ Management & Automatic Vector Indexing
+- **Embedding on Write Paths**: Embeddings and SHA-256 hashes are computed automatically upon FAQ creation, editing, and suggestion approval.
+- **Change Detection**: SHA-256 hash tracking prevents redundant embedding recalculations when text remains unchanged.
+- **Hidden Vector Fields**: `embedding` and `embeddingHash` use `select: false` so vector arrays never leak to client APIs.
+
+### 3. Unified Authentication (NextAuth.js v5)
 - **Role-Based Access Control (RBAC)**: Separates platform functionality into `user` and `admin` portals.
-- **Secure Credentials Auth**: Passwords are securely hashed using `bcryptjs` upon user registration.
-- **Session Protection**: Protects specific directories (e.g., `/dashboard`, `/admin/*`) using Next.js Middleware.
-- **Dual Login Views**: Seamlessly handles standard candidate login alongside dedicated administrator portals.
+- **Secure Credentials Auth**: Passwords hashed using `bcryptjs`.
+- **Middleware Route Guards**: Protects `/dashboard`, `/admin/*`, and support workflow endpoints.
 
-### 2. Rich Interactive FAQ Browser
-- **Dynamic Search**: Instant responsive filtering with MongoDB fuzzy text matching.
-- **Category Filter Pills**: High-fidelity clickable category pills corresponding to primary cohort topics (NOC, Certificates, Selection, Work & Mentorship, Rosetta Journal, etc.).
-- **Smooth Animations**: Animated collapsible accordions built with `framer-motion` to offer a premium UI.
+### 4. Support Queries & Community FAQ Suggestions
+- **Raise Support Queries**: Direct query submission with priority levels (`Low`, `Medium`, `High`) and category tagging.
+- **Query Tracking**: Live status monitor with administrator reply threads.
+- **Suggest FAQs**: Interns can propose new FAQs; administrators can approve them with single-click auto-embedding conversion.
 
-### 3. "Yaksha Mini" Intelligent Chatbot
-- **Interactive Popup**: An animated floating chatbot located at the bottom-right corner.
-- **Instant Search API**: Matches questions in real time using a MongoDB `$text` search on the FAQ database, returning the best response and linking relevant items.
-- **Action Fallbacks**: Guides users when no matches are found by offering shortcut buttons to suggest a new FAQ or submit a direct query.
-- **Chat Histories**: Stores dialogues directly in `chatHistory` for session persistent retention.
-
-### 4. Support Queries & Suggestion Workflows
-- **Raise Queries**: Dedicated portal to submit formal query cases complete with categorization and priority levels (`Low`, `Medium`, `High`).
-- **Query Tracking**: Instantly monitor status, timestamps, and administrator replies in real-time.
-- **FAQ Suggestions**: Empower cohort members to suggest fresh FAQs, automatically routing submissions to the moderation panel.
-
-### 5. Multi-dimensional Admin Dashboard
-- **Recharts Analytics**: Interactive and responsive visual charts (Pie, Bar) outlining FAQ categories, query frequencies, and status distributions.
-- **CRUD Operations**: Edit, add, or delete live FAQs dynamically.
-- **Moderation Panel**: Accept or reject community FAQ suggestions with notes, updating the FAQ collection automatically upon approval.
-- **User and Support Management**: Complete users view with access revocation and intuitive reply modals to address pending support tickets.
+### 5. Administrator Control Center
+- **Interactive Visual Analytics**: Responsive Recharts charts (Category distribution, Query status, User activity).
+- **FAQ Management**: Real-time CRUD operations with instant vector updates.
+- **Suggestion Moderation**: Accept or reject community proposals with admin review notes.
 
 ---
 
@@ -125,55 +108,64 @@ graph TD
 
 | Layer | Technology | Purpose |
 | :--- | :--- | :--- |
-| **Core Framework** | Next.js 15.1.0 (App Router) | High-performance React framework for server components and APIs. |
-| **Database** | MongoDB & Mongoose 8.8.2 | Document database for storage with singleton connection patterns. |
-| **Authentication** | NextAuth.js v5 (Beta 25) | Unified role-based JWT authentication and middleware guards. |
-| **Styling** | Tailwind CSS v4.0.0 | Rapid utility-first styling for elegant, premium interfaces. |
-| **Animations** | Framer Motion 11.11.17 | Fluid micro-interactions, page reveals, and chatbot popups. |
-| **Visual Reports** | Recharts 2.13.3 | Multi-colored SVG charts for admin statistics. |
-| **Icons** | Lucide React 0.460.0 | Clean, lightweight modern SVG icons. |
+| **Core Framework** | Next.js 15.1.0 (App Router, React 19) | Server components, streaming, and REST API handlers. |
+| **Database** | MongoDB Atlas & Mongoose 8.8.2 | Document database with `$vectorSearch` and `$text` search indices. |
+| **Embeddings** | `@xenova/transformers` (`all-MiniLM-L6-v2`) | Local 384-dimensional ONNX vector embedding generation. |
+| **LLM Provider** | OpenRouter API (`openrouter/free`) | Grounded natural-language generation with 15s timeout. |
+| **Authentication** | NextAuth.js v5 (Beta 25) | Role-based JWT authentication and middleware guards. |
+| **Styling** | Tailwind CSS v4.0.0 | High-performance modern utility styling. |
+| **Animations** | Framer Motion 11.11.17 | Fluid micro-interactions and chatbot animations. |
+| **Visual Reports** | Recharts 2.13.3 | Visual administrative metrics and analytics. |
 
 ---
 
 ## 📂 Project Structure
 
 ```bash
-f:\FAQ\
-├── app/                      # Next.js App Router root
-│   ├── (auth)/               # Auth routes (Login & Registration)
-│   ├── admin/                # Admin views (Login & Dashboards)
-│   ├── api/                  # Backend REST API Routes
-│   │   ├── admin/stats/      # Aggregated metrics for Recharts
-│   │   ├── auth/             # Custom signup API endpoints
-│   │   ├── chat/             # Chatbot search and history logging
-│   │   ├── faq-suggestions/  # User FAQ suggestions CRUD
-│   │   ├── faqs/             # Main FAQ CRUD and Search API
-│   │   ├── queries/          # User Support query submissions
-│   │   └── users/            # Administrator user administration
-│   ├── dashboard/            # Candidate home space (protected)
-│   ├── faqs/                 # Interactive user FAQ directory
-│   ├── query-status/         # Direct query lookup portal
-│   ├── raise-query/          # Submit support queries form
-│   ├── suggest-faq/          # Suggestion form interface
-│   ├── globals.css           # Global CSS variables & Tailwind v4
-│   ├── layout.tsx            # Main HTML structure & Root layout
-│   └── page.tsx              # Beautiful Landing Page with CTA sections
-├── components/               # Shareable UI elements (e.g. Chatbot, Navbar)
-├── lib/                      # Core helpers
-│   └── db.ts                 # MongoDB connection manager (Singleton Pattern)
-├── models/                   # Mongoose Database Schemas
-│   ├── ChatHistory.ts        # Conversational bot log schema
-│   ├── Faq.ts                # Base FAQ Schema (question, answer, category)
-│   ├── FaqSuggestion.ts      # FAQ recommendation schema
-│   ├── Query.ts              # Ticket system database schema
-│   └── User.ts               # Authenticated candidate credentials schema
-├── public/                   # Static icons, vector graphics, and images
-├── scripts/                  # Project seeding scripts
-│   └── seedFaqs.ts           # Clears collections & imports seed FAQ payload
-├── types/                    # Common Typescript interfaces
-├── package.json              # App dependencies & script records
-├── tsconfig.json             # Typescript configurations
-└── next.config.ts            # Next.js app configurations
+FAQ/
+├── app/                        # Next.js App Router root
+│   ├── (auth)/                 # Auth routes (Login & Registration)
+│   ├── admin/                  # Admin views (Dashboard, FAQs, Queries, Users)
+│   ├── api/                    # Backend REST API Routes
+│   │   ├── admin/stats/        # Aggregated metrics for Recharts
+│   │   ├── auth/               # Custom signup API endpoints
+│   │   ├── chat/               # RAG Chatbot API route with rate limiting
+│   │   ├── faq-suggestions/    # User FAQ suggestions CRUD & moderation
+│   │   ├── faqs/               # Main FAQ CRUD and Search API (auto-embedding)
+│   │   ├── queries/            # Support ticket workflows
+│   │   └── users/              # Administrator user management
+│   ├── dashboard/              # Candidate home space (protected)
+│   ├── faqs/                   # Interactive user FAQ directory
+│   ├── query-status/           # Direct query lookup portal
+│   ├── raise-query/            # Submit support queries form
+│   ├── suggest-faq/            # Suggestion form interface
+│   ├── globals.css             # Global styling & Tailwind v4
+│   ├── layout.tsx              # Main HTML structure & Root layout
+│   └── page.tsx                # Landing Page with interactive features
+├── components/                 # Shareable UI components (YakshaChat, Navbar, AdminLayout)
+├── lib/                        # Core backend utilities
+│   ├── db.ts                   # MongoDB connection manager (Singleton)
+│   ├── embeddings.ts           # Singleton local MiniLM-L6-v2 384d embedder
+│   ├── vectorSearch.ts         # Atlas $vectorSearch and in-memory cosine fallback
+│   ├── keywordSearch.ts        # MongoDB $text & regex search fallback
+│   ├── openrouter.ts           # OpenRouter LLM generation & prompt grounding
+│   └── rateLimit.ts            # Sliding window in-memory rate limiter
+├── models/                     # Mongoose Schemas
+│   ├── ChatHistory.ts          # Conversational log schema
+│   ├── Faq.ts                  # FAQ schema with embedding & hash (select: false)
+│   ├── FaqSuggestion.ts        # FAQ recommendation schema
+│   ├── Query.ts                # Ticket system database schema
+│   └── User.ts                 # Authenticated candidate credentials schema
+├── scripts/                    # Automation & Testing scripts
+│   ├── seedFaqs.ts             # Seeds 50+ official FAQs with embeddings
+│   ├── generateFaqEmbeddings.ts# Backfills embeddings for existing FAQs
+│   ├── createAtlasIndex.ts     # Creates Atlas Search Vector Index
+│   ├── testRetrieval.ts        # Evaluates vector retrieval & similarity threshold
+│   └── testChatPipeline.ts     # End-to-end RAG pipeline test suite
+├── atlas-vector-index.json     # Atlas Vector Search index definition
+├── .env.example                # Environment variable documentation
+├── package.json                # Project dependencies and npm scripts
+└── next.config.ts              # Next.js configurations & serverExternalPackages
 ```
 
 ---
@@ -181,14 +173,13 @@ f:\FAQ\
 ## 🚀 Setup & Execution Guide
 
 ### 📋 Prerequisites
-Ensure the following tools are installed on your environment:
 - **Node.js**: `v18.x` or higher (compatible with React 19)
-- **MongoDB**: A running local MongoDB instance or a remote **MongoDB Atlas** database URI.
+- **MongoDB**: MongoDB Atlas cluster (recommended for Vector Search) or local MongoDB instance.
+- **OpenRouter API Key**: Free key from [openrouter.ai](https://openrouter.ai/).
 
 ---
 
-### Step 1: Clone and Dependencies Installation
-Navigate to your repository and download node packages:
+### Step 1: Install Dependencies
 ```bash
 npm install
 ```
@@ -196,84 +187,128 @@ npm install
 ---
 
 ### Step 2: Configure Environment Variables
-Create a `.env.local` file at the project root using the following template:
+Copy `.env.example` to `.env.local`:
+```bash
+cp .env.example .env.local
+```
 
+Fill in your configuration:
 ```env
-# MongoDB Connection String (Replace with your database configuration)
-MONGODB_URI=mongodb://localhost:27017/yaksha-faq
+# MongoDB Connection
+MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.mongodb.net/yaksha_portal?retryWrites=true&w=majority
 
 # NextAuth Configuration
 NEXTAUTH_SECRET=your_super_secret_jwt_signature_key
 NEXTAUTH_URL=http://localhost:3000
-```
 
-> [!NOTE]
-> Make sure `NEXTAUTH_SECRET` is a long, randomly generated string in production environments. You can generate one via: `openssl rand -base64 32`.
+# OpenRouter RAG Configuration
+OPENROUTER_API_KEY=sk-or-v1-your-openrouter-key
+OPENROUTER_MODEL=openrouter/free
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# Vector Search (Optional)
+VECTOR_MODE=atlas
+ATLAS_VECTOR_INDEX=vector_index
+SIMILARITY_THRESHOLD=0.65
+```
 
 ---
 
-### Step 3: Seed the Database
-Seed Vicharanashala's official internship FAQ entries (12 categories, 40+ structured items) and configure MongoDB text indices by running the seeding script:
+### Step 3: Seed FAQs with Embeddings
+Seed Vicharanashala's official internship FAQ entries (12 categories, 50+ structured items) and generate vector embeddings:
 
 ```bash
-# Using tsx to execute the typescript seed script
 npm run seed
 ```
 
-This script will:
-1. Connect securely to your MongoDB database using the singleton connection.
-2. Flush any old FAQ documents to prevent double seeds.
-3. Import the rich FAQ data package.
-4. Establish a `$text` search index on both the `question` and `answer` properties, enabling fast fuzzy search for the Yaksha Chatbot.
-
----
-
-### Step 4: Run the Development Server
-Launch the compiler and Next.js development server locally:
-
+To backfill embeddings for existing FAQs at any time:
 ```bash
-npm run dev
+npm run embed-faqs
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your favorite browser to test the platform.
+---
+
+### Step 4: Create MongoDB Atlas Vector Search Index
+If you are using MongoDB Atlas, create the Search Index automatically:
+
+```bash
+npm run create-atlas-index
+```
+
+Or configure it manually in MongoDB Atlas Search UI:
+- **Index Name**: `vector_index`
+- **Type**: `vectorSearch`
+- **JSON Definition**:
+```json
+{
+  "fields": [
+    {
+      "type": "vector",
+      "path": "embedding",
+      "numDimensions": 384,
+      "similarity": "cosine"
+    }
+  ]
+}
+```
 
 ---
 
-### Step 5: Production Build and Start
-To compile optimizations for live deployment, run the production build:
+### Step 5: Test the RAG Pipeline
+Run the automated test suite verifying exact matches, semantic rephrasing, out-of-domain questions, and prompt injection safety:
 
 ```bash
-# Build the optimized production output
-npm run build
+# Test retrieval and threshold separation
+npx tsx scripts/testRetrieval.ts
 
-# Start the built production server
+# Test end-to-end grounded chat generation
+npx tsx scripts/testChatPipeline.ts
+```
+
+---
+
+### Step 6: Run the Application
+
+```bash
+# Start development server
+npm run dev
+
+# Or build and start for production
+npm run build
 npm run start
 ```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
 ## 👤 Database Schemas
-
-### Users (`users`)
-```typescript
-{
-  name: string;
-  email: string;
-  password (hashed): string;
-  role: 'user' | 'admin';
-  createdAt: Date;
-}
-```
 
 ### FAQs (`faqs`)
 ```typescript
 {
   question: string;
   answer: string;
-  category: string; // "NOC", "Timing and Dates", "Work & Mentorship", etc.
+  category: string;
+  embedding?: number[];     // 384-dim vector (select: false)
+  embeddingHash?: string;   // SHA-256 hash (select: false)
   createdAt: Date;
+  updatedAt: Date;
 }
-// Requires MongoDB $text index on question + answer
+```
+
+### Chat Logs (`chatHistory`)
+```typescript
+{
+  userId: ObjectId; // Verified session user ID
+  messages: [
+    {
+      sender: 'user' | 'bot';
+      text: string;
+      timestamp: Date;
+    }
+  ];
+}
 ```
 
 ### Support Queries (`queries`)
@@ -293,44 +328,13 @@ npm run start
 }
 ```
 
-### Chat Logs (`chatHistory`)
-```typescript
-{
-  userId?: string; // Session ID or anonymous token
-  messages: [
-    {
-      sender: 'user' | 'bot';
-      text: string;
-      timestamp: Date;
-    }
-  ]
-}
-```
-
-### FAQ Suggestions (`faqSuggestions`)
-```typescript
-{
-  userId?: ObjectId;
-  question: string;
-  suggestedAnswer: string;
-  category: string;
-  description?: string;
-  status: 'Pending' | 'Approved' | 'Rejected';
-  adminReview?: string;
-  createdAt: Date;
-}
-```
-
 ---
 
-## 🎨 UI & Design Principles
-
-The UI has been tailored to reflect Vicharanashala's professional standards:
-- **Clean Theme**: Pristine modern backdrop styling (`#FFFFFF` / `#F8FAFC`).
-- **Harmonious Accents**: Professional Ocean Blue (`#2563EB`) as primary tone, beautifully accented with deep amethyst violet (`#7C3AED`).
-- **Glassmorphism Panels**: Interactive containers utilize soft backdrop blur filters (`backdrop-blur-md`), semi-transparent borders (`border-white/20`), and subtle shadows (`shadow-lg`).
-- **Premium Animations**: Integrated subtle slide-ins, spring-based hovers, and clean responsive micro-interactions using Framer Motion.
-- **Inter Font**: Streamlined global typography using Google's Inter sans-serif typeface.
+## 🎨 Design Principles
+- **Clean Aesthetic**: Modern light palette (`#FFFFFF` / `#F8FAFC`).
+- **Harmonious Accents**: Ocean Blue (`#2563EB`) accented with Deep Amethyst Violet (`#7C3AED`).
+- **Glassmorphic Panels**: Backdrop blur filters (`backdrop-blur-md`) and subtle shadow elevations.
+- **Fluid Micro-Interactions**: Spring physics animations via Framer Motion.
 
 ---
 

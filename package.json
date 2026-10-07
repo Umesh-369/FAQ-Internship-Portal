@@ -12,6 +12,11 @@
     "create-atlas-index": "tsx scripts/createAtlasIndex.ts"
   },
   "dependencies": {
+    "@tailwindcss/postcss": "^4.0.0",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20.17.6",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
     "@xenova/transformers": "^2.17.2",
     "bcryptjs": "^2.4.3",
     "framer-motion": "^11.11.17",
@@ -21,19 +26,14 @@
     "next-auth": "5.0.0-beta.25",
     "react": "19.0.0",
     "react-dom": "19.0.0",
-    "recharts": "^2.13.3"
+    "recharts": "^2.13.3",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.6.3"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.0.0",
-    "@types/bcryptjs": "^2.4.6",
-    "@types/node": "^20.17.6",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
     "eslint": "^9.0.0",
     "eslint-config-next": "15.1.0",
-    "tailwindcss": "^4.0.0",
     "ts-node": "^10.9.2",
-    "tsx": "^4.22.3",
-    "typescript": "^5.6.3"
+    "tsx": "^4.22.3"
   }
 }

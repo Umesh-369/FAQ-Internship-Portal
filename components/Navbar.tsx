@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import { motion } from 'framer-motion';
-import { Sparkles, LayoutDashboard, LogOut, User, LogIn, Menu } from 'lucide-react';
+import { Sparkles, LayoutDashboard, LogOut } from 'lucide-react';
 
 export default function Navbar() {
   const pathname = usePathname();

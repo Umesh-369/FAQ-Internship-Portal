@@ -4,7 +4,7 @@ import dbConnect from '../../../lib/db';
 import Query from '../../../models/Query';
 
 // GET /api/queries (Protected: Students get their own, Admin gets all)
-export async function GET(req: Request) {
+export async function GET() {
   try {
     const session = await auth();
 

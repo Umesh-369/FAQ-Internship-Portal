@@ -4,7 +4,7 @@ import dbConnect from '../../../lib/db';
 import User from '../../../models/User';
 
 // GET /api/users (Admin only)
-export async function GET(req: Request) {
+export async function GET() {
   try {
     const session = await auth();
 

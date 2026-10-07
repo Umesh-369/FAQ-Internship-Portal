@@ -5,7 +5,7 @@ import AdminLayout from '../../../components/AdminLayout';
 import { useToast } from '../../../components/Providers';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  Users, Loader2, Trash2, AlertTriangle, X, RefreshCw, ShieldAlert, User
+  Users, Loader2, Trash2, AlertTriangle, RefreshCw, ShieldAlert, User
 } from 'lucide-react';
 
 interface UserData {

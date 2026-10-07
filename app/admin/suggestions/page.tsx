@@ -5,8 +5,8 @@ import AdminLayout from '../../../components/AdminLayout';
 import { useToast } from '../../../components/Providers';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  MessageSquarePlus, Loader2, CheckCircle2, XCircle, Clock,
-  RefreshCw, X, Sparkles
+  MessageSquarePlus, Loader2, CheckCircle2, XCircle,
+  RefreshCw, X
 } from 'lucide-react';
 
 interface Suggestion {

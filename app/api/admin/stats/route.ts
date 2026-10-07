@@ -7,7 +7,7 @@ import FaqSuggestion from '../../../../models/FaqSuggestion';
 import User from '../../../../models/User';
 
 // GET /api/admin/stats (Admin only)
-export async function GET(req: Request) {
+export async function GET() {
   try {
     const session = await auth();
 

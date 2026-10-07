@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import Navbar from '../../components/Navbar';
 import { useToast } from '../../components/Providers';
 import { motion } from 'framer-motion';
-import { AlertCircle, Loader2, Send, HelpCircle, Check } from 'lucide-react';
+import { AlertCircle, Loader2, Send, Check } from 'lucide-react';
 
 const CATEGORIES = [
   'About the Internship',

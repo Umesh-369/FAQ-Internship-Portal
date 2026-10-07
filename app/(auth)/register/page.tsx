@@ -55,7 +55,7 @@ export default function RegisterPage() {
       } else {
         showToast(data.message || 'Registration failed. Please try again.', 'error');
       }
-    } catch (err) {
+    } catch (_err) {
       showToast('An unexpected error occurred. Please try again.', 'error');
     } finally {
       setIsLoading(false);

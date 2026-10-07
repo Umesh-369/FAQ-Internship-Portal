@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Navbar from '../../components/Navbar';
 import { useToast } from '../../components/Providers';
 import { motion } from 'framer-motion';
-import { PlusCircle, Loader2, Send, Sparkles } from 'lucide-react';
+import { PlusCircle, Loader2, Send } from 'lucide-react';
 
 const CATEGORIES = [
   'About the Internship',
@@ -24,7 +24,7 @@ const CATEGORIES = [
 ];
 
 export default function SuggestFaqPage() {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const router = useRouter();
   const { showToast } = useToast();
 

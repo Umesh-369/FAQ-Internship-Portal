@@ -5,8 +5,7 @@ import AdminLayout from '../../../components/AdminLayout';
 import { useToast } from '../../../components/Providers';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Inbox, Loader2, MessageSquare, X, Send, Clock, CheckCircle2,
-  AlertCircle, ChevronDown, RefreshCw
+  Inbox, Loader2, MessageSquare, X, Send, RefreshCw
 } from 'lucide-react';
 
 interface Query {

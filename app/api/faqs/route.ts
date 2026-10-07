@@ -13,7 +13,7 @@ export async function GET(req: Request) {
 
     await dbConnect();
 
-    let query: any = {};
+    const query: Record<string, any> = {};
 
     if (category && category !== 'All') {
       query.category = category;

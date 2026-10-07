@@ -5,10 +5,9 @@ import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import Navbar from '../../components/Navbar';
 import { useToast } from '../../components/Providers';
-import { motion } from 'framer-motion';
 import { 
-  PlusCircle, Loader2, AlertCircle, Clock, CheckCircle2, MessageSquare, 
-  ArrowRight, Sparkles, Inbox, RefreshCw, HelpCircle, FileText
+  PlusCircle, Loader2, AlertCircle, Clock, CheckCircle2, 
+  ArrowRight, Inbox, RefreshCw, HelpCircle, FileText
 } from 'lucide-react';
 
 interface Query {
@@ -81,7 +80,6 @@ export default function StudentDashboardPage() {
   const solvedQueries = queries.filter((q) => q.status === 'Solved').length;
   const pendingQueries = queries.filter((q) => q.status === 'Pending').length;
   const totalSuggestions = suggestions.length;
-  const approvedSuggestions = suggestions.filter((s) => s.status === 'Approved').length;
 
   return (
     <div className="flex-1 flex flex-col font-sans">

@@ -95,7 +95,7 @@ export default function YakshaChat() {
       } else {
         throw new Error(data.message || 'Failed to get response');
       }
-    } catch (error) {
+    } catch (_error) {
       setMessages((prev) => [
         ...prev,
         {

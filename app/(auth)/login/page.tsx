@@ -39,7 +39,7 @@ export default function LoginPage() {
         router.push('/dashboard');
         router.refresh();
       }
-    } catch (err) {
+    } catch (_err) {
       showToast('An unexpected error occurred. Please try again.', 'error');
     } finally {
       setIsLoading(false);

@@ -6,7 +6,7 @@ import { useToast } from '../../../components/Providers';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, Edit2, Trash2, Search, X, Loader2, Sparkles, AlertTriangle, 
-  HelpCircle, ChevronDown, CheckCircle2 
+  HelpCircle 
 } from 'lucide-react';
 
 interface Faq {

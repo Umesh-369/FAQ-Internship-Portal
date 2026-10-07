@@ -3,13 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import AdminLayout from '../../../components/AdminLayout';
 import { useToast } from '../../../components/Providers';
-import { motion } from 'framer-motion';
 import { 
   BarChart as RechartBarChart, Bar, XAxis, YAxis, Tooltip, Legend, 
   ResponsiveContainer, PieChart as RechartPieChart, Pie, Cell, CartesianGrid 
 } from 'recharts';
 import { 
-  FileText, Users, Inbox, HelpCircle, Loader2, Sparkles, AlertCircle 
+  Users, Inbox, HelpCircle, Loader2, Sparkles, AlertCircle 
 } from 'lucide-react';
 
 interface Stats {

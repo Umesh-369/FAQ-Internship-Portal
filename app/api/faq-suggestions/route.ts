@@ -4,7 +4,7 @@ import dbConnect from '../../../lib/db';
 import FaqSuggestion from '../../../models/FaqSuggestion';
 
 // GET /api/faq-suggestions (Protected: Student gets own, Admin gets all)
-export async function GET(req: Request) {
+export async function GET() {
   try {
     const session = await auth();
 

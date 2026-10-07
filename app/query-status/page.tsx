@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import Navbar from '../../components/Navbar';
 import { useToast } from '../../components/Providers';
 import { motion } from 'framer-motion';
-import { Search, Loader2, Sparkles, AlertCircle, Clock, CheckCircle2, MessageSquare, ArrowRight } from 'lucide-react';
+import { Search, Loader2, Sparkles, AlertCircle, Clock, CheckCircle2, MessageSquare } from 'lucide-react';
 
 interface Query {
   _id: string;

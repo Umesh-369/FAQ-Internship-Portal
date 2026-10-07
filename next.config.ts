@@ -1,24 +1,17 @@
 import type { NextConfig } from "next";
 
+const BACKEND_URL = process.env.RENDER_BACKEND_URL || 'https://yaksha-faq.onrender.com';
+
 const nextConfig: NextConfig = {
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  // Enable React compiler optimizations
-  reactStrictMode: false,
-  // Compress responses
-  compress: true,
-  // Optimize package imports to reduce bundle size and speed up compilation
-  experimental: {
-    optimizePackageImports: ['lucide-react', 'recharts', 'framer-motion'],
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: `${BACKEND_URL}/api/:path*`,
+      },
+    ];
   },
   serverExternalPackages: ['@xenova/transformers', 'onnxruntime-node', 'sharp'],
-  // Reduce unnecessary logging in dev
-  logging: {
-    fetches: {
-      fullUrl: false,
-    },
-  },
 };
 
 export default nextConfig;

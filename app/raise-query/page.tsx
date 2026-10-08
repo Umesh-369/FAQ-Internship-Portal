@@ -21,6 +21,7 @@ const CATEGORIES = [
   'Team Formation',
   'Yaksha Chat',
   'Interviews',
+  'Other',
 ];
 
 const PRIORITIES: ('Low' | 'Medium' | 'High')[] = ['Low', 'Medium', 'High'];

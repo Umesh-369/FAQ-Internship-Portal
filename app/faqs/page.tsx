@@ -27,6 +27,7 @@ const CATEGORIES = [
   'Team Formation',
   'Yaksha Chat',
   'Interviews',
+  'Other',
 ];
 
 function FaqContent() {

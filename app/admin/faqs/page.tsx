@@ -30,6 +30,7 @@ const CATEGORIES = [
   'Team Formation',
   'Yaksha Chat',
   'Interviews',
+  'Other',
 ];
 
 export default function AdminFaqPage() {
